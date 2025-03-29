@@ -1,0 +1,305 @@
+:root {
+    --table-color: #1b5e20;
+    --wood-color: #5d4037;
+    --player1-color: #2196F3;
+    --player2-color: #FF5722;
+    --button-color: #4CAF50;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #0a0a0a;
+    color: white;
+    margin: 0;
+    padding: 10px;
+    overflow-x: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+}
+
+#game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+#header {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+#header h1 {
+    font-size: 1.5rem;
+    margin: 5px 0;
+}
+
+#header p {
+    margin: 5px 0;
+    font-size: 0.9rem;
+}
+
+#canvas-container {
+    position: relative;
+    width: 100%;
+    max-width: 800px;
+    height: auto;
+    aspect-ratio: 2/1;
+    border: 8px solid var(--wood-color);
+    border-radius: 8px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
+    background-color: var(--table-color);
+    overflow: hidden;
+    margin-left: 40px;
+}
+
+#pool-table {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+#streak-trigger {
+    position: absolute;
+    left: -40px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 25px;
+    height: 80px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+#streak-trigger:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+#cue-stick {
+    position: absolute;
+    width: 150px;
+    height: 6px;
+    background-color: #deb887;
+    transform-origin: right center;
+    pointer-events: none;
+    display: none;
+}
+
+#power-meter {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    max-width: 200px;
+    height: 15px;
+    background-color: rgba(0,0,0,0.5);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#power-level {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(to right, #4CAF50, #FFC107, #F44336);
+    transition: width 0.1s;
+}
+
+#power-value {
+    position: absolute;
+    top: -20px;
+    width: 100%;
+    text-align: center;
+    font-size: 12px;
+}
+
+#controls {
+    margin-top: 10px;
+    background-color: #333;
+    padding: 10px;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 800px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+button {
+    padding: 8px 15px;
+    background-color: var(--button-color);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.9rem;
+    min-width: 100px;
+}
+
+button:disabled {
+    background-color: #666;
+    cursor: not-allowed;
+}
+
+#player-info {
+    display: flex;
+    gap: 10px;
+    flex-grow: 1;
+    justify-content: center;
+}
+
+.player-indicator {
+    padding: 8px 12px;
+    border-radius: 5px;
+    font-weight: bold;
+    font-size: 0.8rem;
+    text-align: center;
+    flex-grow: 1;
+}
+
+#player1-indicator {
+    background-color: var(--player1-color);
+}
+
+#player2-indicator {
+    background-color: var(--player2-color);
+}
+
+.active-player {
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+}
+
+#message {
+    margin-top: 10px;
+    padding: 8px;
+    background-color: #444;
+    border-radius: 5px;
+    text-align: center;
+    min-height: 20px;
+    font-size: 0.9rem;
+    width: 100%;
+    max-width: 800px;
+}
+
+/* Betting System Styles */
+#betting-container {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    width: 90%;
+    max-width: 300px;
+    background-color: #333;
+    padding: 12px;
+    border-radius: 8px;
+    color: white;
+    z-index: 1000;
+    font-size: 0.9rem;
+}
+
+#betting-container h2 {
+    margin: 0 0 8px 0;
+    font-size: 1.1rem;
+}
+
+#betting-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#betting-form input, #betting-form select {
+    padding: 8px;
+    border-radius: 5px;
+    border: none;
+    font-size: 0.9rem;
+}
+
+#betting-form button {
+    padding: 8px;
+    font-size: 0.9rem;
+}
+
+#timer-display {
+    text-align: center;
+    font-size: 0.9rem;
+    margin: 8px 0;
+    font-weight: bold;
+}
+
+#current-bets {
+    margin-top: 10px;
+    max-height: 150px;
+    overflow-y: auto;
+    font-size: 0.8rem;
+}
+
+.bet-item {
+    background-color: #444;
+    padding: 6px;
+    margin-bottom: 4px;
+    border-radius: 4px;
+}
+
+#winner-display {
+    text-align: center;
+    font-size: 0.9rem;
+    margin-top: 8px;
+    font-weight: bold;
+    color: gold;
+    display: none;
+}
+
+/* Mobile-specific styles */
+@media (max-width: 600px) {
+    #canvas-container {
+        margin-left: 30px;
+    }
+    
+    #streak-trigger {
+        left: -30px;
+        width: 20px;
+        height: 60px;
+    }
+    
+    #controls {
+        flex-direction: column;
+    }
+    
+    #player-info {
+        width: 100%;
+    }
+    
+    #betting-container {
+        position: static;
+        max-width: 100%;
+        margin-top: 15px;
+    }
+}
+
+@media (max-width: 400px) {
+    #header h1 {
+        font-size: 1.2rem;
+    }
+    
+    .player-indicator {
+        font-size: 0.7rem;
+        padding: 6px 8px;
+    }
+    
+    button {
+        padding: 6px 10px;
+        min-width: 80px;
+        font-size: 0.8rem;
+    }
+}
