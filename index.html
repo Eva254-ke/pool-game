@@ -8,6 +8,10 @@
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
 </head>
 <body>
+    <div id="fullscreen-toggle">
+        <button id="fullscreen-btn">Full Screen</button>
+    </div>
+    
     <div id="game-container">
         <div id="header">
             <h1>Two-Player Pool Game</h1>
@@ -58,6 +62,11 @@
         </div>
     </div>
 
+    <div class="mobile-controls">
+        <button class="mobile-rotate-btn">↻</button>
+        <button class="mobile-shoot-btn">SHOOT</button>
+    </div>
+
     <script src="phaser-game.js"></script>
     <script src="betting-system.js"></script>
     <script>
@@ -81,6 +90,40 @@
                 const newWidth = Math.min(800, window.innerWidth - 40);
                 const newHeight = Math.min(400, window.innerHeight * 0.6);
                 game.resizeCanvas(newWidth, newHeight);
+            });
+            
+            // Fullscreen functionality
+            document.getElementById('fullscreen-btn').addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(err => {
+                        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+                    });
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    }
+                }
+            });
+            
+            // Mobile controls event listeners
+            document.querySelector('.mobile-shoot-btn').addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                game.executeShot();
+            });
+            
+            document.querySelector('.mobile-rotate-btn').addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                game.rotateCueAngle();
+            });
+            
+            // Hide betting container in fullscreen mode
+            document.addEventListener('fullscreenchange', () => {
+                const bettingContainer = document.getElementById('betting-container');
+                if (document.fullscreenElement) {
+                    bettingContainer.style.display = 'none';
+                } else {
+                    bettingContainer.style.display = 'block';
+                }
             });
         };
     </script>

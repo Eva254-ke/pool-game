@@ -4,7 +4,8 @@ class PoolGame {
         this.config = {
             canvasId: options.canvasId || 'pool-table',
             width: options.width || 800,
-            height: options.height || 400
+            height: options.height || 400,
+            mobileThreshold: 768 // Width below which mobile controls are enhanced
         };
         
         // Game Constants
@@ -15,6 +16,7 @@ class PoolGame {
         this.MIN_VELOCITY = 0.05;
         this.MAX_SHOT_POWER = 25;
         this.CUE_LENGTH = 150;
+        this.MIN_TOUCH_DISTANCE = 30; // Minimum distance to register a shot
         
         // Game State
         this.balls = [];
@@ -31,6 +33,10 @@ class PoolGame {
         this.player2Type = 'striped';
         this.player1Score = 0;
         this.player2Score = 0;
+        this.isMobile = window.innerWidth <= this.config.mobileThreshold;
+        this.touchStartPos = null;
+        this.touchCurrentPos = null;
+        this.showDirectionIndicator = false;
         
         // DOM Elements
         this.canvas = document.getElementById(this.config.canvasId);
@@ -43,6 +49,13 @@ class PoolGame {
         this.player1Indicator = document.getElementById('player1-indicator');
         this.player2Indicator = document.getElementById('player2-indicator');
         this.messageEl = document.getElementById('message');
+        this.directionIndicator = document.getElementById('direction-indicator');
+        this.touchControls = document.getElementById('touch-controls');
+        this.joystickArea = document.getElementById('joystick-area');
+        this.joystick = document.getElementById('joystick');
+        
+        // Initialize responsive design
+        window.addEventListener('resize', () => this.handleResize());
     }
 
     init() {
@@ -54,6 +67,24 @@ class PoolGame {
         this.setupEventListeners();
         this.gameLoop();
         this.updateUI();
+        
+        // Initialize mobile controls if needed
+        this.initMobileControls();
+    }
+    
+    handleResize() {
+        this.isMobile = window.innerWidth <= this.config.mobileThreshold;
+        this.initMobileControls();
+    }
+    
+    initMobileControls() {
+        if (this.isMobile) {
+            this.touchControls.style.display = 'flex';
+            this.shootBtn.style.display = 'block';
+        } else {
+            this.touchControls.style.display = 'none';
+            this.shootBtn.style.display = 'none';
+        }
     }
     
     resizeCanvas(width, height) {
@@ -352,6 +383,46 @@ class PoolGame {
                 this.ctx.fillText(ball.number.toString(), ball.x, ball.y);
             }
         });
+        
+        // Draw direction indicator if aiming on mobile
+        if (this.isMobile && this.showDirectionIndicator && this.touchCurrentPos && this.touchStartPos) {
+            const cueBall = this.balls.find(b => b.type === 'cue' && b.visible);
+            if (cueBall) {
+                // Draw line from cue ball to indicate direction
+                this.ctx.beginPath();
+                this.ctx.moveTo(cueBall.x, cueBall.y);
+                this.ctx.lineTo(
+                    cueBall.x + (cueBall.x - this.touchCurrentPos.x) * 2,
+                    cueBall.y + (cueBall.y - this.touchCurrentPos.y) * 2
+                );
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+                
+                // Draw power indicator
+                const power = Math.min(
+                    Math.sqrt(
+                        Math.pow(this.touchCurrentPos.x - this.touchStartPos.x, 2) + 
+                        Math.pow(this.touchCurrentPos.y - this.touchStartPos.y, 2)
+                    ) / 2, 
+                    this.MAX_SHOT_POWER
+                );
+                const powerPercent = Math.round((power / this.MAX_SHOT_POWER) * 100);
+                
+                // Draw power circle around cue ball
+                this.ctx.beginPath();
+                this.ctx.arc(
+                    cueBall.x, 
+                    cueBall.y, 
+                    this.BALL_RADIUS + (powerPercent / 100) * this.BALL_RADIUS * 2, 
+                    0, 
+                    Math.PI * 2
+                );
+                this.ctx.strokeStyle = `rgba(255, ${255 - powerPercent * 2.55}, 0, 0.5)`;
+                this.ctx.lineWidth = 3;
+                this.ctx.stroke();
+            }
+        }
     }
 
     setupEventListeners() {
@@ -379,8 +450,29 @@ class PoolGame {
         this.newGameBtn.addEventListener('click', () => this.resetGame());
         this.shootBtn.addEventListener('click', () => this.executeShot());
         document.getElementById('streak-trigger').addEventListener('click', () => this.triggerStreak());
+        
+        // Virtual joystick controls for mobile
+        this.joystickArea.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.handleJoystickStart(e);
+        });
+        
+        document.addEventListener('touchmove', (e) => {
+            if (this.joystickActive) {
+                e.preventDefault();
+                this.handleJoystickMove(e);
+            }
+        });
+        
+        document.addEventListener('touchend', (e) => {
+            if (this.joystickActive) {
+                e.preventDefault();
+                this.handleJoystickEnd(e);
+            }
+        });
     }
     
+    // Mobile touch controls
     handleTouchStart(e) {
         if (!this.gameActive || !this.allBallsStopped()) return;
         
@@ -397,11 +489,15 @@ class PoolGame {
             Math.pow(touchY - cueBall.y, 2)
         );
         
-        if (dist <= cueBall.radius) {
+        if (dist <= cueBall.radius * 2) { // Larger touch area for mobile
             this.aiming = true;
-            this.cueBallStartPos = { x: touchX, y: touchY };
-            this.updateAimingFromPosition(touchX, touchY);
+            this.touchStartPos = { x: touchX, y: touchY };
+            this.touchCurrentPos = { x: touchX, y: touchY };
+            this.showDirectionIndicator = true;
             this.shootBtn.disabled = true;
+            
+            // Update power meter immediately
+            this.updateAimingFromPosition(touchX, touchY);
         }
     }
     
@@ -414,13 +510,131 @@ class PoolGame {
         const touchX = touch.clientX - rect.left;
         const touchY = touch.clientY - rect.top;
         
+        this.touchCurrentPos = { x: touchX, y: touchY };
         this.updateAimingFromPosition(touchX, touchY);
     }
     
     handleTouchEnd(e) {
         if (!this.aiming) return;
         e.preventDefault();
-        this.executeShot();
+        
+        // Only execute shot if moved enough distance
+        if (this.touchStartPos && this.touchCurrentPos) {
+            const dist = Math.sqrt(
+                Math.pow(this.touchCurrentPos.x - this.touchStartPos.x, 2) + 
+                Math.pow(this.touchCurrentPos.y - this.touchStartPos.y, 2)
+            );
+            
+            if (dist >= this.MIN_TOUCH_DISTANCE) {
+                this.executeShot();
+            } else {
+                this.messageEl.textContent = "Swipe further to shoot!";
+                setTimeout(() => {
+                    if (this.allBallsStopped()) {
+                        this.messageEl.textContent = `${this.currentPlayer === 'player1' ? 'Player 1' : 'Player 2'}'s turn.`;
+                    }
+                }, 1000);
+            }
+        }
+        
+        this.showDirectionIndicator = false;
+        this.touchStartPos = null;
+        this.touchCurrentPos = null;
+        this.cancelAiming();
+    }
+    
+    // Virtual joystick controls
+    handleJoystickStart(e) {
+        if (!this.gameActive || !this.allBallsStopped()) return;
+        
+        const touch = e.touches[0];
+        const rect = this.joystickArea.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        this.joystickActive = true;
+        this.joystickStartPos = { x: centerX, y: centerY };
+        this.joystick.style.display = 'block';
+        this.joystick.style.left = `${touch.clientX - 25}px`;
+        this.joystick.style.top = `${touch.clientY - 25}px`;
+        
+        // Get cue ball position
+        const cueBall = this.balls.find(b => b.type === 'cue' && b.visible);
+        if (cueBall) {
+            this.cueBallStartPos = { x: cueBall.x, y: cueBall.y };
+        }
+    }
+    
+    handleJoystickMove(e) {
+        if (!this.joystickActive) return;
+        
+        const touch = e.touches[0];
+        const rect = this.joystickArea.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        // Calculate joystick position (limited to joystick area)
+        let joystickX = touch.clientX;
+        let joystickY = touch.clientY;
+        
+        // Limit to joystick area bounds
+        const maxDistance = rect.width / 2;
+        const distance = Math.sqrt(
+            Math.pow(touch.clientX - centerX, 2) + 
+            Math.pow(touch.clientY - centerY, 2)
+        );
+        
+        if (distance > maxDistance) {
+            const angle = Math.atan2(touch.clientY - centerY, touch.clientX - centerX);
+            joystickX = centerX + Math.cos(angle) * maxDistance;
+            joystickY = centerY + Math.sin(angle) * maxDistance;
+        }
+        
+        this.joystick.style.left = `${joystickX - 25}px`;
+        this.joystick.style.top = `${joystickY - 25}px`;
+        
+        // Calculate shot angle and power based on joystick position
+        const dx = centerX - touch.clientX;
+        const dy = centerY - touch.clientY;
+        this.shotAngle = Math.atan2(dy, dx);
+        
+        // Power is proportional to distance from center
+        const powerDistance = Math.min(distance, maxDistance);
+        this.shotPower = (powerDistance / maxDistance) * this.MAX_SHOT_POWER;
+        
+        // Update power meter
+        const powerPercent = Math.round((this.shotPower / this.MAX_SHOT_POWER) * 100);
+        this.powerLevel.style.width = `${powerPercent}%`;
+        this.powerValue.textContent = `Power: ${powerPercent}%`;
+        
+        // Update cue stick visualization
+        this.updateCueStickVisual();
+    }
+    
+    handleJoystickEnd(e) {
+        if (!this.joystickActive) return;
+        
+        this.joystickActive = false;
+        this.joystick.style.display = 'none';
+        
+        // Only execute shot if joystick was moved significantly
+        if (this.shotPower > this.MAX_SHOT_POWER * 0.1) {
+            this.executeShot();
+        } else {
+            this.cancelAiming();
+        }
+    }
+    
+    updateCueStickVisual() {
+        const cueBall = this.balls.find(b => b.type === 'cue' && b.visible);
+        if (!cueBall) return;
+        
+        // Show cue stick visualization
+        this.cueStick.style.display = 'block';
+        this.cueStick.style.left = `${cueBall.x - Math.cos(this.shotAngle) * this.CUE_LENGTH}px`;
+        this.cueStick.style.top = `${cueBall.y - Math.sin(this.shotAngle) * this.CUE_LENGTH}px`;
+        this.cueStick.style.transform = `rotate(${this.shotAngle}rad)`;
+        this.cueStick.style.width = `${this.CUE_LENGTH * 2}px`;
     }
 
     startAiming(e) {
@@ -475,11 +689,19 @@ class PoolGame {
         this.powerValue.textContent = `Power: ${powerPercent}%`;
         
         // Update cue stick position
-        this.cueStick.style.display = 'block';
-        this.cueStick.style.left = `${cueBall.x - Math.cos(this.shotAngle) * this.CUE_LENGTH}px`;
-        this.cueStick.style.top = `${cueBall.y - Math.sin(this.shotAngle) * this.CUE_LENGTH}px`;
-        this.cueStick.style.transform = `rotate(${this.shotAngle}rad)`;
-        this.cueStick.style.width = `${this.CUE_LENGTH + distance}px`;
+        if (!this.joystickActive) {
+            this.cueStick.style.display = 'block';
+            this.cueStick.style.left = `${cueBall.x - Math.cos(this.shotAngle) * this.CUE_LENGTH}px`;
+            this.cueStick.style.top = `${cueBall.y - Math.sin(this.shotAngle) * this.CUE_LENGTH}px`;
+            this.cueStick.style.transform = `rotate(${this.shotAngle}rad)`;
+            this.cueStick.style.width = `${this.CUE_LENGTH + distance}px`;
+        }
+        
+        // Update direction indicator for mobile
+        this.directionIndicator.style.display = 'block';
+        this.directionIndicator.style.left = `${cueBall.x - 15}px`;
+        this.directionIndicator.style.top = `${cueBall.y - 15}px`;
+        this.directionIndicator.style.transform = `rotate(${this.shotAngle}rad)`;
     }
 
     takeShot(e) {
@@ -504,10 +726,14 @@ class PoolGame {
 
     cancelAiming() {
         this.aiming = false;
+        this.joystickActive = false;
+        this.showDirectionIndicator = false;
         this.shotPower = 0;
         this.powerLevel.style.width = '0%';
         this.powerValue.textContent = 'Power: 0%';
         this.cueStick.style.display = 'none';
+        this.directionIndicator.style.display = 'none';
+        this.joystick.style.display = 'none';
     }
 
     allBallsStopped() {
@@ -588,7 +814,7 @@ class PoolGame {
         this.updateUI();
         
         if (this.allBallsStopped()) {
-            this.messageEl.textContent = `${this.currentPlayer === 'player1' ? 'Player 1' : 'Player 2'}'s turn. Click and drag from the cue ball to aim.`;
+            this.messageEl.textContent = `${this.currentPlayer === 'player1' ? 'Player 1' : 'Player 2'}'s turn.`;
             this.shootBtn.disabled = false;
         }
     }
@@ -620,13 +846,19 @@ class PoolGame {
         
         if (this.currentPlayer === 'player1') {
             this.player1Indicator.classList.add('active-player');
+            this.player1Indicator.textContent = `Player 1 (Solids): ${this.player1Score}`;
+            this.player2Indicator.textContent = `Player 2 (Stripes): ${this.player2Score}`;
         } else {
             this.player2Indicator.classList.add('active-player');
+            this.player1Indicator.textContent = `Player 1 (Solids): ${this.player1Score}`;
+            this.player2Indicator.textContent = `Player 2 (Stripes): ${this.player2Score}`;
         }
         
-        // Update player info text
-        this.player1Indicator.textContent = `Player 1 (Solids): ${this.player1Score}`;
-        this.player2Indicator.textContent = `Player 2 (Stripes): ${this.player2Score}`;
+        // Update mobile controls visibility
+        if (this.isMobile) {
+            this.touchControls.style.display = 'flex';
+            this.shootBtn.style.display = this.allBallsStopped() ? 'block' : 'none';
+        }
     }
 
     triggerStreak() {

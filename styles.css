@@ -4,6 +4,7 @@
     --player1-color: #2196F3;
     --player2-color: #FF5722;
     --button-color: #4CAF50;
+    --cue-stick-color: #deb887;
 }
 
 * {
@@ -86,11 +87,15 @@ body {
 #cue-stick {
     position: absolute;
     width: 150px;
-    height: 6px;
-    background-color: #deb887;
+    height: 8px;
+    background: linear-gradient(to right, rgba(222, 184, 135, 0.8), var(--cue-stick-color));
     transform-origin: right center;
     pointer-events: none;
     display: none;
+    z-index: 998;
+    box-shadow: 0 0 5px rgba(0,0,0,0.5);
+    border-radius: 4px;
+    transition: opacity 0.2s;
 }
 
 #power-meter {
@@ -145,11 +150,16 @@ button {
     font-weight: bold;
     font-size: 0.9rem;
     min-width: 100px;
+    transition: all 0.2s;
 }
 
 button:disabled {
     background-color: #666;
     cursor: not-allowed;
+}
+
+button:active {
+    transform: scale(0.95);
 }
 
 #player-info {
@@ -190,6 +200,76 @@ button:disabled {
     font-size: 0.9rem;
     width: 100%;
     max-width: 800px;
+}
+
+/* Fullscreen toggle button */
+#fullscreen-toggle {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 1001;
+}
+
+#fullscreen-btn {
+    background-color: rgba(0,0,0,0.7);
+    color: white;
+    border: 1px solid white;
+    padding: 8px 12px;
+    border-radius: 5px;
+    font-size: 0.9rem;
+    min-width: auto;
+}
+
+/* Mobile controls */
+.mobile-controls {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    justify-content: center;
+    gap: 20px;
+    z-index: 1000;
+    padding: 0 20px;
+}
+
+.mobile-shoot-btn {
+    background-color: var(--button-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 70px;
+    height: 70px;
+    font-size: 1rem;
+    font-weight: bold;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mobile-rotate-btn {
+    background-color: var(--player1-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    font-size: 1.5rem;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Guide line styles */
+#guide-line {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.5);
+    height: 2px;
+    transform-origin: left center;
+    pointer-events: none;
+    z-index: 999;
 }
 
 /* Betting System Styles */
@@ -260,24 +340,78 @@ button:disabled {
     display: none;
 }
 
+/* Fullscreen styles */
+:fullscreen #game-container {
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    margin: 0;
+    padding: 20px;
+    justify-content: center;
+}
+
+:fullscreen #canvas-container {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    border: none;
+    border-radius: 0;
+    margin: 0;
+    aspect-ratio: unset;
+}
+
+:fullscreen #pool-table {
+    width: 100%;
+    height: 100%;
+}
+
+:fullscreen #controls {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 800px;
+}
+
+:fullscreen #message {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+}
+
+:fullscreen #betting-container {
+    display: none;
+}
+
+:fullscreen .mobile-controls {
+    bottom: 120px;
+}
+
 /* Mobile-specific styles */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
+    .mobile-controls {
+        display: flex;
+    }
+    
+    #shoot-btn {
+        display: none;
+    }
+    
     #canvas-container {
-        margin-left: 30px;
+        margin-left: 0;
     }
     
     #streak-trigger {
-        left: -30px;
-        width: 20px;
-        height: 60px;
+        display: none;
     }
     
-    #controls {
-        flex-direction: column;
-    }
-    
-    #player-info {
-        width: 100%;
+    #cue-stick {
+        height: 10px;
+        opacity: 0.9;
+        width: 180px;
     }
     
     #betting-container {
@@ -285,11 +419,16 @@ button:disabled {
         max-width: 100%;
         margin-top: 15px;
     }
+    
+    #fullscreen-btn {
+        padding: 10px 15px;
+        font-size: 1rem;
+    }
 }
 
-@media (max-width: 400px) {
+@media (max-width: 480px) {
     #header h1 {
-        font-size: 1.2rem;
+        font-size: 1.3rem;
     }
     
     .player-indicator {
@@ -300,6 +439,43 @@ button:disabled {
     button {
         padding: 6px 10px;
         min-width: 80px;
+        font-size: 0.8rem;
+    }
+    
+    .mobile-shoot-btn {
+        width: 65px;
+        height: 65px;
+        font-size: 0.9rem;
+    }
+    
+    .mobile-rotate-btn {
+        width: 55px;
+        height: 55px;
+        font-size: 1.3rem;
+    }
+    
+    #message {
+        font-size: 0.8rem;
+        padding: 6px;
+    }
+}
+
+@media (max-height: 600px) {
+    #canvas-container {
+        max-height: 60vh;
+    }
+    
+    .mobile-controls {
+        bottom: 10px;
+    }
+    
+    #controls {
+        padding: 8px;
+    }
+    
+    #message {
+        margin-top: 5px;
+        padding: 5px;
         font-size: 0.8rem;
     }
 }
