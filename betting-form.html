@@ -1,0 +1,21 @@
+<!-- betting-form.html -->
+<div id="betting-container">
+    <h2>Place Your Bet</h2>
+    <div id="timer-display">Next round in: 4:00</div>
+    <div id="winner-display"></div>
+    
+    <form id="betting-form">
+        <select id="player-select" required>
+            <option value="">Select Player</option>
+            <option value="player1">Player 1 (Solids)</option>
+            <option value="player2">Player 2 (Stripes)</option>
+        </select>
+        <input type="number" id="bet-amount" min="1" placeholder="Bet Amount" required>
+        <button type="submit" id="place-bet-btn">Place Bet</button>
+    </form>
+    
+    <div id="current-bets">
+        <h3>Current Bets</h3>
+        <!-- Bets will be displayed here -->
+    </div>
+</div>

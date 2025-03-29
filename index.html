@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Two-Player Pool Game with Betting</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #0a0a0a;
+            color: white;
+            margin: 0;
+            padding: 20px;
+            overflow: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        #header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #canvas-container {
+            position: relative;
+            width: 800px;
+            height: 400px;
+            border: 10px solid #5d4037;
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+            background-color: #1b5e20;
+            overflow: hidden;
+            margin-left: 50px;
+        }
+        #streak-trigger {
+            position: absolute;
+            left: -50px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 100px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 15px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #streak-trigger:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        #pool-table {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+        #cue-stick {
+            position: absolute;
+            width: 200px;
+            height: 8px;
+            background-color: #deb887;
+            transform-origin: right center;
+            pointer-events: none;
+            display: none;
+        }
+        #power-meter {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 20px;
+            background-color: rgba(0,0,0,0.5);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #power-level {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(to right, #4CAF50, #FFC107, #F44336);
+            transition: width 0.1s;
+        }
+        #power-value {
+            position: absolute;
+            top: -25px;
+            width: 100%;
+            text-align: center;
+            font-size: 14px;
+        }
+        #controls {
+            margin-top: 20px;
+            background-color: #333;
+            padding: 15px;
+            border-radius: 10px;
+            width: 800px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+        #player-info {
+            display: flex;
+            gap: 20px;
+        }
+        .player-indicator {
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        #player1-indicator {
+            background-color: #2196F3;
+        }
+        #player2-indicator {
+            background-color: #FF5722;
+        }
+        .active-player {
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        }
+        #message {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #444;
+            border-radius: 5px;
+            text-align: center;
+            min-height: 20px;
+        }
+        /* Betting System Styles */
+        #betting-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 300px;
+            background-color: #333;
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+            z-index: 1000;
+        }
+        #betting-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        #betting-form input, #betting-form select {
+            padding: 8px;
+            border-radius: 5px;
+            border: none;
+        }
+        #betting-form button {
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        #betting-form button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+        #timer-display {
+            text-align: center;
+            font-size: 18px;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        #current-bets {
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .bet-item {
+            background-color: #444;
+            padding: 8px;
+            margin-bottom: 5px;
+            border-radius: 5px;
+        }
+        #winner-display {
+            text-align: center;
+            font-size: 18px;
+            margin-top: 10px;
+            font-weight: bold;
+            color: gold;
+            display: none;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+</head>
+<body>
+    <div id="game-container">
+        <div id="header">
+            <h1>Two-Player Pool Game</h1>
+            <p>Player 1 (Solids) vs Player 2 (Stripes)</p>
+        </div>
+        
+        <div id="canvas-container">
+            <div id="streak-trigger" title="Click for vertical streak shot"></div>
+            <canvas id="pool-table" width="800" height="400"></canvas>
+            <div id="cue-stick"></div>
+            <div id="power-meter">
+                <div id="power-level"></div>
+                <div id="power-value">Power: 0%</div>
+            </div>
+        </div>
+        
+        <div id="controls">
+            <button id="new-game">New Game</button>
+            
+            <div id="player-info">
+                <div id="player1-indicator" class="player-indicator active-player">Player 1 (Solids)</div>
+                <div id="player2-indicator" class="player-indicator">Player 2 (Stripes)</div>
+            </div>
+            
+            <button id="shoot-btn" disabled>Shoot</button>
+        </div>
+        
+        <div id="message">Player 1's turn. Click and drag from the cue ball to aim.</div>
+    </div>
+
+    <!-- Betting System Container -->
+    <div id="betting-container">
+        <h2>Place Your Bet</h2>
+        <div id="timer-display">Next round in: 4:00</div>
+        <div id="winner-display"></div>
+        
+        <form id="betting-form">
+            <select id="player-select" required>
+                <option value="">Select Player</option>
+                <option value="player1">Player 1 (Solids)</option>
+                <option value="player2">Player 2 (Stripes)</option>
+            </select>
+            <input type="number" id="bet-amount" min="1" placeholder="Bet Amount" required>
+            <button type="submit" id="place-bet-btn">Place Bet</button>
+        </form>
+        
+        <div id="current-bets">
+            <h3>Current Bets</h3>
+        </div>
+    </div>
+
+    <script>
+        // Game Constants
+        const BALL_RADIUS = 15;
+        const POCKET_RADIUS = 25;
+        const FRICTION = 0.985;
+        const RESTITUTION = 0.85;
+        const MIN_VELOCITY = 0.05;
+        const MAX_SHOT_POWER = 25;
+        const CUE_LENGTH = 150;
+        
+        // Game State
+        let balls = [];
+        let pockets = [];
+        let currentPlayer = 'player1';
+        let gameActive = true;
+        let aiming = false;
+        let shotPower = 0;
+        let shotAngle = 0;
+        let cueBallStartPos = { x: 0, y: 0 };
+        let lastTime = 0;
+        let animationId;
+        let player1Type = 'solid';
+        let player2Type = 'striped';
+        let player1Score = 0;
+        let player2Score = 0;
+        
+        // DOM Elements
+        const canvas = document.getElementById('pool-table');
+        const ctx = canvas.getContext('2d');
+        const cueStick = document.getElementById('cue-stick');
+        const powerLevel = document.getElementById('power-level');
+        const powerValue = document.getElementById('power-value');
+        const newGameBtn = document.getElementById('new-game');
+        const shootBtn = document.getElementById('shoot-btn');
+        const player1Indicator = document.getElementById('player1-indicator');
+        const player2Indicator = document.getElementById('player2-indicator');
+        const messageEl = document.getElementById('message');
+
+        // Initialize the game
+        function initGame() {
+            createPockets();
+            createBalls();
+            setupEventListeners();
+            gameLoop();
+            updateUI();
+        }
+        
+        // Create pockets
+        function createPockets() {
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            pockets = [
+                { x: 0, y: 0 },
+                { x: width / 2, y: 0 },
+                { x: width, y: 0 },
+                { x: 0, y: height },
+                { x: width / 2, y: height },
+                { x: width, y: height }
+            ];
+        }
+        
+        // Create balls with proper pool setup
+        function createBalls() {
+            balls = [];
+            
+            // Cue ball (white)
+            balls.push({
+                x: canvas.width / 4,
+                y: canvas.height / 2,
+                vx: 0,
+                vy: 0,
+                radius: BALL_RADIUS,
+                color: 'white',
+                number: 0,
+                type: 'cue',
+                visible: true
+            });
+            
+            // Ball colors and numbers (standard pool)
+            const ballColors = [
+                { color: 'yellow', number: 1, type: 'solid' },
+                { color: 'blue', number: 2, type: 'solid' },
+                { color: 'red', number: 3, type: 'solid' },
+                { color: 'purple', number: 4, type: 'solid' },
+                { color: 'orange', number: 5, type: 'solid' },
+                { color: 'green', number: 6, type: 'solid' },
+                { color: 'maroon', number: 7, type: 'solid' },
+                { color: 'black', number: 8, type: 'eight' },
+                { color: 'yellow', number: 9, type: 'striped', stripe: true },
+                { color: 'blue', number: 10, type: 'striped', stripe: true },
+                { color: 'red', number: 11, type: 'striped', stripe: true },
+                { color: 'purple', number: 12, type: 'striped', stripe: true },
+                { color: 'orange', number: 13, type: 'striped', stripe: true },
+                { color: 'green', number: 14, type: 'striped', stripe: true },
+                { color: 'maroon', number: 15, type: 'striped', stripe: true }
+            ];
+            
+            // Arrange balls in triangle formation
+            const startX = canvas.width * 3/4;
+            const startY = canvas.height / 2;
+            let ballIndex = 0;
+            
+            for (let row = 0; row < 5; row++) {
+                for (let col = 0; col <= row; col++) {
+                    if (ballIndex >= ballColors.length) break;
+                    
+                    const x = startX + (col - row/2) * (BALL_RADIUS * 2.1);
+                    const y = startY - row * (BALL_RADIUS * 1.8) + BALL_RADIUS;
+                    
+                    balls.push({
+                        x: x,
+                        y: y,
+                        vx: 0,
+                        vy: 0,
+                        radius: BALL_RADIUS,
+                        color: ballColors[ballIndex].color,
+                        number: ballColors[ballIndex].number,
+                        type: ballColors[ballIndex].type,
+                        stripe: ballColors[ballIndex].stripe || false,
+                        visible: true
+                    });
+                    
+                    ballIndex++;
+                }
+            }
+        }
+        
+        // Main game loop
+        function gameLoop(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            const deltaTime = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+            
+            updatePhysics(deltaTime);
+            render();
+            animationId = requestAnimationFrame(gameLoop);
+        }
+        
+        // Update ball physics
+        function updatePhysics(deltaTime) {
+            if (!gameActive) return;
+            
+            // Update ball positions
+            balls.forEach(ball => {
+                if (!ball.visible) return;
+                
+                ball.x += ball.vx * deltaTime * 60;
+                ball.y += ball.vy * deltaTime * 60;
+                
+                // Apply friction
+                ball.vx *= FRICTION;
+                ball.vy *= FRICTION;
+                
+                // Stop very slow balls
+                if (Math.abs(ball.vx) < MIN_VELOCITY) ball.vx = 0;
+                if (Math.abs(ball.vy) < MIN_VELOCITY) ball.vy = 0;
+                
+                // Boundary collision with cushions
+                if (ball.x - ball.radius < 0) {
+                    ball.x = ball.radius;
+                    ball.vx *= -RESTITUTION;
+                }
+                if (ball.x + ball.radius > canvas.width) {
+                    ball.x = canvas.width - ball.radius;
+                    ball.vx *= -RESTITUTION;
+                }
+                if (ball.y - ball.radius < 0) {
+                    ball.y = ball.radius;
+                    ball.vy *= -RESTITUTION;
+                }
+                if (ball.y + ball.radius > canvas.height) {
+                    ball.y = canvas.height - ball.radius;
+                    ball.vy *= -RESTITUTION;
+                }
+            });
+            
+            // Ball-to-ball collisions
+            for (let i = 0; i < balls.length; i++) {
+                if (!balls[i].visible) continue;
+                
+                for (let j = i + 1; j < balls.length; j++) {
+                    if (!balls[j].visible) continue;
+                    
+                    const dx = balls[j].x - balls[i].x;
+                    const dy = balls[j].y - balls[i].y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < balls[i].radius + balls[j].radius) {
+                        // Collision detected
+                        const angle = Math.atan2(dy, dx);
+                        const speed1 = Math.sqrt(balls[i].vx * balls[i].vx + balls[i].vy * balls[i].vy);
+                        const speed2 = Math.sqrt(balls[j].vx * balls[j].vx + balls[j].vy * balls[j].vy);
+                        
+                        const direction1 = Math.atan2(balls[i].vy, balls[i].vx);
+                        const direction2 = Math.atan2(balls[j].vy, balls[j].vx);
+                        
+                        const velocityX1 = speed1 * Math.cos(direction1 - angle);
+                        const velocityY1 = speed1 * Math.sin(direction1 - angle);
+                        const velocityX2 = speed2 * Math.cos(direction2 - angle);
+                        const velocityY2 = speed2 * Math.sin(direction2 - angle);
+                        
+                        // Final velocities after collision
+                        const finalVelocityX1 = velocityX2;
+                        const finalVelocityX2 = velocityX1;
+                        
+                        // Update velocities
+                        balls[i].vx = Math.cos(angle) * finalVelocityX1 + Math.cos(angle + Math.PI/2) * velocityY1;
+                        balls[i].vy = Math.sin(angle) * finalVelocityX1 + Math.sin(angle + Math.PI/2) * velocityY1;
+                        balls[j].vx = Math.cos(angle) * finalVelocityX2 + Math.cos(angle + Math.PI/2) * velocityY2;
+                        balls[j].vy = Math.sin(angle) * finalVelocityX2 + Math.sin(angle + Math.PI/2) * velocityY2;
+                        
+                        // Move balls apart to prevent sticking
+                        const overlap = (balls[i].radius + balls[j].radius - distance) / 2;
+                        balls[i].x -= overlap * Math.cos(angle);
+                        balls[i].y -= overlap * Math.sin(angle);
+                        balls[j].x += overlap * Math.cos(angle);
+                        balls[j].y += overlap * Math.sin(angle);
+                    }
+                }
+            }
+            
+            // Check pocket collisions
+            balls.forEach(ball => {
+                if (!ball.visible) return;
+                
+                for (const pocket of pockets) {
+                    const dx = ball.x - pocket.x;
+                    const dy = ball.y - pocket.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < POCKET_RADIUS) {
+                        // Ball is in pocket
+                        ball.visible = false;
+                        
+                        // Handle cue ball pocketing
+                        if (ball.type === 'cue') {
+                            messageEl.textContent = "Cue ball pocketed! It will be respotted.";
+                            setTimeout(() => {
+                                respotCueBall();
+                                endTurn(false);
+                            }, 1000);
+                            return;
+                        }
+                        
+                        // Handle scoring
+                        if (ball.type === 'eight') {
+                            checkEightBallWin(ball);
+                        } else {
+                            updateScore(ball);
+                        }
+                    }
+                }
+            });
+            
+            // Check if all balls have stopped moving
+            if (gameActive && !aiming && allBallsStopped()) {
+                shootBtn.disabled = false;
+                updateUI();
+            }
+        }
+        
+        // Render the game
+        function render() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw table felt
+            ctx.fillStyle = '#1b5e20';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw table edges
+            ctx.strokeStyle = '#5d4037';
+            ctx.lineWidth = 20;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw pockets
+            ctx.fillStyle = 'black';
+            pockets.forEach(pocket => {
+                ctx.beginPath();
+                ctx.arc(pocket.x, pocket.y, POCKET_RADIUS, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            // Draw balls
+            balls.forEach(ball => {
+                if (!ball.visible) return;
+                
+                // Draw ball
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                
+                if (ball.stripe) {
+                    // Draw striped ball
+                    ctx.fillStyle = ball.color;
+                    ctx.fill();
+                    
+                    ctx.fillStyle = 'white';
+                    ctx.beginPath();
+                    ctx.arc(ball.x, ball.y, ball.radius * 0.7, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = ball.color;
+                    ctx.beginPath();
+                    ctx.arc(ball.x, ball.y, ball.radius * 0.5, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    // Draw solid or cue ball
+                    ctx.fillStyle = ball.color;
+                    ctx.fill();
+                }
+                
+                // Draw ball number (except cue ball)
+                if (ball.number > 0) {
+                    ctx.fillStyle = ball.color === 'yellow' || ball.color === 'white' ? 'black' : 'white';
+                    ctx.font = `${ball.radius * 0.7}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(ball.number.toString(), ball.x, ball.y);
+                }
+            });
+        }
+        
+        // Set up event listeners
+        function setupEventListeners() {
+            // Mouse controls for aiming
+            canvas.addEventListener('mousedown', startAiming);
+            canvas.addEventListener('mousemove', updateAiming);
+            canvas.addEventListener('mouseup', takeShot);
+            canvas.addEventListener('mouseleave', cancelAiming);
+            
+            // Button controls
+            newGameBtn.addEventListener('click', resetGame);
+            shootBtn.addEventListener('click', executeShot);
+            document.getElementById('streak-trigger').addEventListener('click', triggerStreak);
+            
+            // Add new function for streak trigger
+            function triggerStreak() {
+                const cueBall = balls.find(b => b.type === 'cue' && b.visible);
+                if (!cueBall) return;
+                
+                // Apply vertical force to cue ball
+                cueBall.vx = 0;
+                cueBall.vy = -MAX_SHOT_POWER * 1.5; // Stronger vertical shot
+                
+                messageEl.textContent = "Streak shot activated!";
+                shootBtn.disabled = true;
+                gameActive = true;
+            }
+        }
+        
+        // Start aiming
+        function startAiming(e) {
+            if (!gameActive || !allBallsStopped()) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            const cueBall = balls.find(b => b.type === 'cue' && b.visible);
+            if (!cueBall) return;
+            
+            // Check if click is on cue ball
+            const dist = Math.sqrt(
+                Math.pow(mouseX - cueBall.x, 2) + 
+                Math.pow(mouseY - cueBall.y, 2)
+            );
+            
+            if (dist <= cueBall.radius) {
+                aiming = true;
+                cueBallStartPos = { x: mouseX, y: mouseY };
+                updateAiming(e);
+                shootBtn.disabled = true;
+            }
+        }
+        
+        // Update aiming
+        function updateAiming(e) {
+            if (!aiming) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            const cueBall = balls.find(b => b.type === 'cue' && b.visible);
+            if (!cueBall) return;
+            
+            // Calculate shot angle and power
+            const dx = cueBall.x - mouseX;
+            const dy = cueBall.y - mouseY;
+            shotAngle = Math.atan2(dy, dx);
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            shotPower = Math.min(distance / 2, MAX_SHOT_POWER);
+            const powerPercent = Math.round((shotPower / MAX_SHOT_POWER) * 100);
+            
+            // Update power meter
+            powerLevel.style.width = `${powerPercent}%`;
+            powerValue.textContent = `Power: ${powerPercent}%`;
+            
+            // Update cue stick position
+            cueStick.style.display = 'block';
+            cueStick.style.left = `${cueBall.x - Math.cos(shotAngle) * CUE_LENGTH}px`;
+            cueStick.style.top = `${cueBall.y - Math.sin(shotAngle) * CUE_LENGTH}px`;
+            cueStick.style.transform = `rotate(${shotAngle}rad)`;
+            cueStick.style.width = `${CUE_LENGTH + distance}px`;
+        }
+        
+        // Take shot
+        function takeShot(e) {
+            if (!aiming) return;
+            executeShot();
+        }
+        
+        // Execute the shot
+        function executeShot() {
+            const cueBall = balls.find(b => b.type === 'cue' && b.visible);
+            if (!cueBall) return;
+            
+            // Apply force to cue ball
+            cueBall.vx = Math.cos(shotAngle) * shotPower;
+            cueBall.vy = Math.sin(shotAngle) * shotPower;
+            
+            // Reset aiming state
+            cancelAiming();
+            gameActive = true;
+            shootBtn.disabled = true;
+            messageEl.textContent = "Balls in motion...";
+        }
+        
+        // Cancel aiming
+        function cancelAiming() {
+            aiming = false;
+            shotPower = 0;
+            powerLevel.style.width = '0%';
+            powerValue.textContent = 'Power: 0%';
+            cueStick.style.display = 'none';
+        }
+        
+        // Check if all balls have stopped
+        function allBallsStopped() {
+            return balls.every(ball => 
+                !ball.visible || 
+                (Math.abs(ball.vx) < MIN_VELOCITY && 
+                Math.abs(ball.vy) < MIN_VELOCITY)
+            );
+        }
+        
+        // Respot cue ball after pocketing
+        function respotCueBall() {
+            const cueBall = balls.find(b => b.type === 'cue');
+            if (cueBall) {
+                cueBall.visible = true;
+                cueBall.x = canvas.width / 4;
+                cueBall.y = canvas.height / 2;
+                cueBall.vx = 0;
+                cueBall.vy = 0;
+            }
+        }
+        
+        // Update score when ball is pocketed
+        function updateScore(ball) {
+            if (ball.type === player1Type) {
+                player1Score++;
+                messageEl.textContent = "Player 1 scored!";
+            } else if (ball.type === player2Type) {
+                player2Score++;
+                messageEl.textContent = "Player 2 scored!";
+            }
+            
+            // Check if player has won by pocketing all their balls
+            const solidsLeft = balls.some(b => b.visible && b.type === 'solid');
+            const stripesLeft = balls.some(b => b.visible && b.type === 'striped');
+            
+            if (currentPlayer === 'player1' && !solidsLeft) {
+                messageEl.textContent = "Player 1 has pocketed all solids! Aim for the 8-ball!";
+            } else if (currentPlayer === 'player2' && !stripesLeft) {
+                messageEl.textContent = "Player 2 has pocketed all stripes! Aim for the 8-ball!";
+            }
+            
+            // Continue current turn if player pocketed their own ball
+            if ((currentPlayer === 'player1' && ball.type === player1Type) || 
+                (currentPlayer === 'player2' && ball.type === player2Type)) {
+                setTimeout(() => {
+                    if (allBallsStopped()) {
+                        messageEl.textContent = `${currentPlayer === 'player1' ? 'Player 1' : 'Player 2'} gets another turn!`;
+                        shootBtn.disabled = false;
+                    }
+                }, 1000);
+            } else {
+                endTurn(true);
+            }
+        }
+        
+        // Check 8-ball win conditions
+        function checkEightBallWin(ball) {
+            const solidsLeft = balls.some(b => b.visible && b.type === 'solid');
+            const stripesLeft = balls.some(b => b.visible && b.type === 'striped');
+            
+            if (currentPlayer === 'player1' && !solidsLeft) {
+                messageEl.textContent = "Player 1 wins by pocketing the 8-ball!";
+                endGame();
+            } else if (currentPlayer === 'player2' && !stripesLeft) {
+                messageEl.textContent = "Player 2 wins by pocketing the 8-ball!";
+                endGame();
+            } else {
+                messageEl.textContent = currentPlayer === 'player1' ? 
+                    "Player 1 loses! Pocketed the 8-ball too early!" : 
+                    "Player 2 loses! Pocketed the 8-ball too early!";
+                endGame();
+            }
+        }
+        
+        // End current player's turn
+        function endTurn(switchPlayer = true) {
+            if (switchPlayer) {
+                currentPlayer = currentPlayer === 'player1' ? 'player2' : 'player1';
+            }
+            
+            updateUI();
+            
+            if (allBallsStopped()) {
+                messageEl.textContent = `${currentPlayer === 'player1' ? 'Player 1' : 'Player 2'}'s turn. Click and drag from the cue ball to aim.`;
+                shootBtn.disabled = false;
+            }
+        }
+        
+        // End the game
+        function endGame() {
+            gameActive = false;
+            shootBtn.disabled = true;
+            setTimeout(resetGame, 3000);
+        }
+        
+        // Reset the game
+        function resetGame() {
+            cancelAnimationFrame(animationId);
+            balls = [];
+            currentPlayer = 'player1';
+            player1Score = 0;
+            player2Score = 0;
+            gameActive = true;
+            createBalls();
+            updateUI();
+            messageEl.textContent = "New game started! Player 1's turn (Solids).";
+            lastTime = 0;
+            animationId = requestAnimationFrame(gameLoop);
+        }
+        
+        // Update UI elements
+        function updateUI() {
+            // Update player indicators
+            player1Indicator.classList.remove('active-player');
+            player2Indicator.classList.remove('active-player');
+            
+            if (currentPlayer === 'player1') {
+                player1Indicator.classList.add('active-player');
+            } else {
+                player2Indicator.classList.add('active-player');
+            }
+            
+            // Update player info text
+            player1Indicator.textContent = `Player 1 (Solids): ${player1Score}`;
+            player2Indicator.textContent = `Player 2 (Stripes): ${player2Score}`;
+        }
+
+        // ===== BETTING SYSTEM =====
+        const bettingForm = document.getElementById('betting-form');
+        const timerDisplay = document.getElementById('timer-display');
+        const winnerDisplay = document.getElementById('winner-display');
+        const currentBetsDiv = document.getElementById('current-bets');
+        
+        let bets = [];
+        let gameTimer;
+        let secondsRemaining = 240; // 4 minutes in seconds
+        let gameRound = 1;
+        let bettingOpen = true;
+        
+        function initBettingSystem() {
+            updateTimerDisplay();
+            bettingForm.addEventListener('submit', placeBet);
+            startGameTimer();
+        }
+        
+        function startGameTimer() {
+            clearInterval(gameTimer);
+            gameTimer = setInterval(() => {
+                secondsRemaining--;
+                updateTimerDisplay();
+                
+                if (secondsRemaining <= 0) {
+                    endBettingRound();
+                }
+            }, 1000);
+        }
+        
+        function updateTimerDisplay() {
+            const minutes = Math.floor(secondsRemaining / 60);
+            const seconds = secondsRemaining % 60;
+            timerDisplay.textContent = `Next round in: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        }
+        
+        function placeBet(e) {
+            e.preventDefault();
+            
+            if (!bettingOpen) {
+                alert("Betting is closed until next round starts!");
+                return;
+            }
+            
+            const playerSelect = document.getElementById('player-select');
+            const betAmountInput = document.getElementById('bet-amount');
+            
+            const player = playerSelect.value;
+            const amount = parseInt(betAmountInput.value);
+            
+            if (!player || !amount || amount < 1) {
+                alert("Please select a player and enter a valid bet amount!");
+                return;
+            }
+            
+            const bet = {
+                player,
+                amount,
+                timestamp: new Date().toLocaleTimeString()
+            };
+            
+            bets.push(bet);
+            updateBetsDisplay();
+            bettingForm.reset();
+        }
+        
+        function updateBetsDisplay() {
+            currentBetsDiv.innerHTML = '<h3>Current Bets</h3>';
+            
+            if (bets.length === 0) {
+                currentBetsDiv.innerHTML += '<p>No bets placed yet</p>';
+                return;
+            }
+            
+            bets.forEach(bet => {
+                const betDiv = document.createElement('div');
+                betDiv.className = 'bet-item';
+                betDiv.innerHTML = `
+                    <strong>${bet.player === 'player1' ? 'Player 1' : 'Player 2'}</strong>: 
+                    $${bet.amount} (${bet.timestamp})
+                `;
+                currentBetsDiv.appendChild(betDiv);
+            });
+        }
+        
+        function endBettingRound() {
+            bettingOpen = false;
+            clearInterval(gameTimer);
+            
+            let winningPlayer;
+            if (player1Score > player2Score) {
+                winningPlayer = 'player1';
+            } else if (player2Score > player1Score) {
+                winningPlayer = 'player2';
+            } else {
+                winningPlayer = 'tie';
+            }
+            
+            if (winningPlayer === 'tie') {
+                winnerDisplay.textContent = "Round ended in a tie! Bets returned.";
+                winnerDisplay.style.color = 'white';
+            } else {
+                winnerDisplay.textContent = `Round ${gameRound} Winner: ${winningPlayer === 'player1' ? 'Player 1' : 'Player 2'}!`;
+                winnerDisplay.style.color = winningPlayer === 'player1' ? '#2196F3' : '#FF5722';
+                
+                const winningBets = bets.filter(bet => bet.player === winningPlayer);
+                const totalWinnings = winningBets.reduce((sum, bet) => sum + bet.amount, 0);
+                
+                if (winningBets.length > 0) {
+                    winnerDisplay.textContent += ` Total winnings: $${totalWinnings * 2}`;
+                }
+            }
+            
+            winnerDisplay.style.display = 'block';
+            
+            setTimeout(() => {
+                startNewRound();
+            }, 5000);
+        }
+        
+        function startNewRound() {
+            gameRound++;
+            secondsRemaining = 240;
+            bets = [];
+            bettingOpen = true;
+            winnerDisplay.style.display = 'none';
+            updateBetsDisplay();
+            startGameTimer();
+        }
+        
+        // Initialize both game and betting system when page loads
+        window.onload = function() {
+            initGame();
+            initBettingSystem();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,60 @@
+/* betting-styles.css */
+#betting-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 300px;
+    background-color: #333;
+    padding: 15px;
+    border-radius: 10px;
+    color: white;
+    z-index: 1000;
+}
+#betting-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+#betting-form input, #betting-form select {
+    padding: 8px;
+    border-radius: 5px;
+    border: none;
+}
+#betting-form button {
+    padding: 10px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+}
+#betting-form button:disabled {
+    background-color: #666;
+    cursor: not-allowed;
+}
+#timer-display {
+    text-align: center;
+    font-size: 18px;
+    margin-top: 10px;
+    font-weight: bold;
+}
+#current-bets {
+    margin-top: 15px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+.bet-item {
+    background-color: #444;
+    padding: 8px;
+    margin-bottom: 5px;
+    border-radius: 5px;
+}
+#winner-display {
+    text-align: center;
+    font-size: 18px;
+    margin-top: 10px;
+    font-weight: bold;
+    color: gold;
+    display: none;
+}
